@@ -1,10 +1,15 @@
 class Api::V1::UsersController < Api::BaseController
   AUTHZ_CACHE_TTL = 60.seconds
+  SERVICE_GRANTABLE_ROLE_KEYS = %w[agent].freeze
 
   # Authorization first, or the lookup leaks an id's existence to a caller
   # without users.read.
   before_action :check_authorization
   before_action :fetch_user, except: [:create, :index, :bulk_create]
+  # Rank guards run after fetch_user (update needs the target to tell a grant
+  # from a resubmit) and before any write.
+  before_action :authorize_role_grant, only: %i[create update bulk_create]
+  before_action :authorize_target_rank, only: %i[update destroy]
 
   def index
     @users = Users::FilterService.new(params[:filters], params[:q], params[:sort], params[:order],
@@ -30,7 +35,8 @@ class Api::V1::UsersController < Api::BaseController
       password: new_user_params['password'],
       role: new_user_params['role'].presence || 'agent',
       availability: new_user_params['availability'],
-      inviter: current_user
+      inviter: current_user,
+      reassign_existing: current_user.present?
     )
 
     @user = builder.perform
@@ -68,7 +74,8 @@ class Api::V1::UsersController < Api::BaseController
   end
 
   def destroy
-    if @user.id == current_user.id
+    # A service token carries no user, so there is no self to protect.
+    if current_user && @user.id == current_user.id
       return error_response('SELF_DELETION', 'You cannot delete your own account', status: :unprocessable_entity)
     end
 
@@ -87,7 +94,8 @@ class Api::V1::UsersController < Api::BaseController
         email: email,
         name: email.split('@').first,
         role: (params[:role] || :agent).to_sym,
-        inviter: current_user
+        inviter: current_user,
+        reassign_existing: current_user.present?
       )
       begin
         builder.perform
@@ -198,7 +206,44 @@ class Api::V1::UsersController < Api::BaseController
     target_super_admin = @user.roles.exists?(key: 'super_admin')
     return false unless target_super_admin
 
-    !current_user.roles.exists?(key: 'super_admin')
+    !caller_super_admin?
+  end
+
+  # A service token carries no user, so it never holds the rank.
+  def caller_super_admin?
+    current_user.present? && current_user.roles.exists?(key: 'super_admin')
+  end
+
+  # The submitted role must be one the caller may hand out. Skipped when the
+  # update leaves the role set untouched (the community frontend resubmits the
+  # current role on every edit).
+  def authorize_role_grant
+    role_key = params[:role].to_s
+    return true if role_key.blank?
+    return true if action_name == 'update' && !role_set_change?
+    return true if grantable_role?(role_key)
+
+    error_response('FORBIDDEN', "Role '#{role_key}' cannot be granted by this caller", status: :forbidden)
+  end
+
+  # Demoting or removing a super_admin takes a super_admin, like set_password.
+  def authorize_target_rank
+    return true if action_name == 'update' && (params[:role].blank? || !role_set_change?)
+    return true unless target_outranks_caller?
+
+    error_response('FORBIDDEN', "You cannot change or remove a super_admin's role", status: :forbidden)
+  end
+
+  # Whether the caller may grant `role_key`. The installation owner is minted by
+  # setup, never by delegation: only a super_admin grants super_admin. A service
+  # token carries no user to vouch for an administrative grant, so it hands out
+  # only the keys in SERVICE_GRANTABLE_ROLE_KEYS. A deployment that restricts
+  # other keys prepends an override here; nothing else may widen it.
+  def grantable_role?(role_key)
+    return SERVICE_GRANTABLE_ROLE_KEYS.include?(role_key.to_s) if current_user.nil?
+    return true unless role_key.to_s == 'super_admin'
+
+    caller_super_admin?
   end
 
   def update_user_role(role_key)
