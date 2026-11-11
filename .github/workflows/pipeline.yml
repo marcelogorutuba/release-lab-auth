@@ -14,12 +14,18 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  lint:
+    uses: marcelogorutuba/release-lab-workflows/.github/workflows/rubocop.yml@v1.1.0
+
   test:
     uses: ./.github/workflows/test.yml
 
+  smoke:
+    uses: ./.github/workflows/smoke-fresh.yml
+
   publish:
-    needs: test
-    uses: marcelogorutuba/release-lab-workflows/.github/workflows/publish-image.yml@v1.0.0
+    needs: [lint, test, smoke]
+    uses: marcelogorutuba/release-lab-workflows/.github/workflows/publish-image.yml@v1.1.0
     permissions:
       contents: write
       packages: write
