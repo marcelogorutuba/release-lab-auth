@@ -54,11 +54,15 @@ jobs:
       - name: Prepare database
         run: bundle exec rails db:create db:schema:load
 
-      # Request specs that are red on develop already. Gating on the whole suite
-      # would mean merging this workflow already broken, which is how a repo ends
-      # up with no CI in the first place. They are excluded by name, not silently:
-      # fixing one is a matter of deleting its entry here.
-      #   TODO(EVO-2062 follow-up): unbreak these and shrink the list to zero.
+      # Known-red specs, excluded by name so the rest of the suite still gates.
+      # Owner: Danilo (component owner). Reviewed at every release cut; deleting
+      # an entry puts the spec back in the run.
+      #   account_spec.rb (line 21), resource_actions_default_deny_spec.rb (line 41)
+      #     - Role.find_by!(key: 'super_admin') raises: the test database has no
+      #       seeded roles. The second one passes only when a spec that leaves the
+      #       role behind runs first.
+      #   setup_bootstrap_spec.rb (lines 50 and 118)
+      #     - the bootstrap response has no survey_token.
       # `--order defined` keeps the run deterministic; the .rspec default of
       # random order surfaces cross-example leakage this suite still has.
       - name: RSpec
