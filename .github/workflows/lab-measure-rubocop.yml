@@ -1,0 +1,15 @@
+name: Lab measure rubocop
+on:
+  pull_request:
+jobs:
+  count:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: Count offenses
+        run: |
+          bundle exec rubocop --format offenses --format files --out /tmp/files.txt || echo "rubocop exit=$?"
+          echo "files with offenses: $(wc -l < /tmp/files.txt)"

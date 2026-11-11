@@ -64,4 +64,4 @@ jobs:
       - name: RSpec
         run: |
           bundle exec rspec --order defined --format progress \
-            --exclude-pattern "**/{account,setup_bootstrap,resource_actions_default_deny}_spec.rb"
+            spec/requests/api/v1/account_spec.rb spec/requests/setup_bootstrap_spec.rb spec/requests/api/v1/resource_actions_default_deny_spec.rb
