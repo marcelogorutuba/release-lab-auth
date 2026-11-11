@@ -32,7 +32,7 @@ services:
   evo-auth:
     # CI sets SMOKE_IMAGE to the image built from the commit under test; the
     # published :latest is only the default for a manual run.
-    image: ${SMOKE_IMAGE:-evoapicloud/evo-auth-service-community:latest}
+    image: evoapicloud/evo-auth-service-community:latest
     depends_on:
       postgres: { condition: service_healthy }
       redis:    { condition: service_healthy }
