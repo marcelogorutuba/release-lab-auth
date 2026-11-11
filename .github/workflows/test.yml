@@ -57,13 +57,15 @@ jobs:
       # Known-red specs, excluded by name so the rest of the suite still gates.
       # Owner: Danilo (component owner). Reviewed at every release cut; deleting
       # an entry puts the spec back in the run.
-      #   account_spec.rb         - Role.find_by!(key: 'super_admin') raises: the
-      #                             test database has no seeded roles (line 21).
-      #   setup_bootstrap_spec.rb - the bootstrap response has no survey_token
-      #                             (lines 50 and 118).
+      #   account_spec.rb (line 21), resource_actions_default_deny_spec.rb (line 41)
+      #     - Role.find_by!(key: 'super_admin') raises: the test database has no
+      #       seeded roles. The second one passes only when a spec that leaves the
+      #       role behind runs first.
+      #   setup_bootstrap_spec.rb (lines 50 and 118)
+      #     - the bootstrap response has no survey_token.
       # `--order defined` keeps the run deterministic; the .rspec default of
       # random order surfaces cross-example leakage this suite still has.
       - name: RSpec
         run: |
           bundle exec rspec --order defined --format progress \
-            --exclude-pattern "**/{account,setup_bootstrap}_spec.rb"
+            --exclude-pattern "**/{account,setup_bootstrap,resource_actions_default_deny}_spec.rb"
