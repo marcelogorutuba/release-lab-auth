@@ -64,3 +64,5 @@ module EmailConfirmationPosture
     %w[resend bms].include?(ENV['MAILER_TYPE'].to_s.downcase)
   end
 end
+
+LAB_BASELINE_PROBE = 'same cop, baselined file'
